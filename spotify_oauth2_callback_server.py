@@ -20,6 +20,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 try:
     server = HTTPServer(('', 8591), RequestHandler)
+    server.timeout = 5
     server.handle_request()
 except KeyboardInterrupt:
     server.socket.close()

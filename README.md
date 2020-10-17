@@ -27,7 +27,6 @@ of Spotify via the Spotify Connect feature.
 First, make sure your system satisfies the given dependencies:
 
 * Emacs 24.4+
-* Python 2.7+ (needed for the Oauth2 callback server)
 
 To manually install spotify.el, just clone this project somewhere in your
 disk, add that directory in the `load-path`, and require the `spotify` module:
@@ -49,7 +48,8 @@ versions of this package used "M-p"
 
 In order to get the the client ID and client secret, you need to create
 [a Spotify app](https://developer.spotify.com/my-applications), specifying
-<http://localhost:8591/> as the redirect URI.
+<http://localhost:8080/spotify-callback> as the redirect URI (or whichever port you have specified via customize).
+The OAuth2 exchange is handled by `simple-httpd`. If you are not already using this package for something else, you should not need to customize this port. Otherwise, you'll want to set it to whatever port you are running on.
 
 To use the "Spotify Connect" transport (vs. controlling only your local instance - though you can
 also control your local instance as well), set `spotify-transport` to `'connect` as follows. This
@@ -64,17 +64,18 @@ feature requires a Spotify premium subscription.
 Go to [Create an Application](https://developer.spotify.com/my-applications/#!/applications/create)
 and give your application a name and a description:
 
-![Creating a Spotify App 1/2](./img/spotify-app-01.png)
+![Creating a Spotify App 1/3](./img/spotify-app-01.png)
+
+After creating the new app, click the **Edit Settings**, scroll down a little bit,
+type <http://localhost:8080/spotify-callback> as the Redirect URI for the
+application, and click **Add**. Then, hit **Save**.
+
+![Creating a Spotify App 2/3](./img/spotify-app-02.png)
 
 At this point, the client ID and the client secret are available, so set those values to
 `spotify-oauth2-client-id` and `spotify-oauth2-client-secret`, respectively.
 
-Then, scroll down a little bit, type <http://localhost:8591/> as the Redirect
-URI for the application, and click **Add**:
-
-![Creating a Spotify App 2/2](./img/spotify-app-02.png)
-
-Finally, scroll to the end of the page and hit **Save**.
+![Creating a Spotify App 3/3](./img/spotify-app-03.png)
 
 ## Usage
 
@@ -116,6 +117,39 @@ player status is updated can be configured via the
 
 [1] No proper support for this in D-Bus implementation for GNU/Linux  
 [2] This feature uses Spotify Connect and requires a premium subscription
+
+Users of the package hydra may find the code below more convenient for managing
+Spotify:
+
+````el
+;; A hydra for controlling spotify.
+(defhydra hydra-spotify (:hint nil)
+    "
+^Search^                  ^Control^               ^Manage^
+^^^^^^^^-----------------------------------------------------------------
+_t_: Track               _SPC_: Play/Pause        _+_: Volume up
+_m_: My Playlists        _n_  : Next Track        _-_: Volume down
+_f_: Featured Playlists  _p_  : Previous Track    _x_: Mute
+_u_: User Playlists      _r_  : Repeat            _d_: Device
+^^                       _s_  : Shuffle           _q_: Quit
+"
+    ("t" spotify-track-search :exit t)
+    ("m" spotify-my-playlists :exit t)
+    ("f" spotify-featured-playlists :exit t)
+    ("u" spotify-user-playlists :exit t)
+    ("SPC" spotify-toggle-play :exit nil)
+    ("n" spotify-next-track :exit nil)
+    ("p" spotify-previous-track :exit nil)
+    ("r" spotify-toggle-repeat :exit nil)
+    ("s" spotify-toggle-shuffle :exit nil)
+    ("+" spotify-volume-up :exit nil)
+    ("-" spotify-volume-down :exit nil)
+    ("x" spotify-volume-mute-unmute :exit nil)
+    ("d" spotify-select-device :exit nil)
+    ("q" quit-window "quit" :color blue))
+
+(bind-key "a" #'hydra-spotify/body some-map)
+````
 
 #### Customizing The Player Status
 
@@ -283,14 +317,8 @@ you can set the following, i.e.:
 ````
 Otherwise, it defaults to 4 spaces.
 
-## Donate
-
-If this project is useful for you, buy me a beer!
-
-Bitcoin: `bc1qtwyfcj7pssk0krn5wyfaca47caar6nk9yyc4mu`
-
 ## License
 
 Copyright (C) Daniel Fernandes Martins
 
-Distributed under the New BSD License. See COPYING for further details.
+Distributed under the GPL v3 License. See COPYING for further details.

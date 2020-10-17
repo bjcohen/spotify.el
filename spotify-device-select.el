@@ -1,10 +1,11 @@
-;;; package --- Summary
+;;; spotify-device-select.el --- Spotify.el device selection major mode  -*- lexical-binding: t; -*-
+
+;; Copyright (C) 2019 Jason Dufair
 
 ;;; Commentary:
 
-;; spotify-device-select.el --- Spotify.el device selection major mode
-
-;; Copyright (C) 2019 Jason Dufair
+;; This library implements methods, UI, and a minor mode to use the "connect" RESTful APIs to manage
+;; and query Spotify clients on the network.
 
 ;;; Code:
 
@@ -12,6 +13,7 @@
 
 (defcustom spotify-selected-device-id ""
   "The id of the device selected for transport."
+  :group 'spotify
   :type 'string)
 
 (defvar spotify-device-select-mode-map
@@ -27,7 +29,7 @@
 (defun spotify-device-select-update ()
   "Fetches the list of devices using the device list endpoint."
   (interactive)
-  (lexical-let ((buffer (current-buffer)))
+  (let ((buffer (current-buffer)))
     (spotify-api-device-list
      (lambda (json)
        (if-let ((devices (gethash 'devices json))
@@ -39,6 +41,21 @@
              (forward-line (1- line))
              (message "Device list updated."))
          (message "No devices are available."))))))
+
+(defun spotify-device-select-active ()
+  "Set the selected device to the active device per the API."
+  (spotify-api-device-list
+   (lambda (json)
+     (when-let ((devices (gethash 'devices json)))
+       (while (let* ((device (car devices))
+                     (is-active (spotify-get-device-is-active device)))
+                (progn
+                  (when (and device is-active)
+                    (progn
+                      (setq spotify-selected-device-id (spotify-get-device-id device))
+                      (spotify-player-status)))
+                  (setq devices (cdr devices))
+                  (and device (not is-active)))))))))
 
 (defun spotify-devices-print (devices)
   "Append the given DEVICES to the devices view."
@@ -61,7 +78,8 @@
                                           ,device-id
                                           (lambda (json)
                                             (setq spotify-selected-device-id ,device-id)
-                                            (message "Device '%s' selected" ,name))))
+                                            (message "Device '%s' selected" ,name)
+                                            (spotify-update-player-status))))
                               'help-echo (format "Select '%s' for transport" name)))
                   (if is-active "X" "")
                   (if is-active (number-to-string volume) "")))
@@ -85,7 +103,7 @@
 
 (defun spotify-get-device-is-active (device)
   "Return whether the DEVICE is currently playing content."
-  (eq (gethash 'is_active device) t))
+  (eq (and device (gethash 'is_active device)) t))
 
 (defun spotify-get-device-volume (device)
   "Return the volume of the DEVICE."
